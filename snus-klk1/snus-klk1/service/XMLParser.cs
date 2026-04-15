@@ -6,5 +6,6 @@ namespace snus_klk1.service
 {
     class XMLParser
     {
+
     }
 }

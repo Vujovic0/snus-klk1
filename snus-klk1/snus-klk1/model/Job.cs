@@ -11,5 +11,10 @@ namespace snus_klk1.model
         private JobType Type { set; get; }
         private string Payload { set; get; } = string.Empty;
         private int Priority { set; get; }
+
+        public Job(Guid Id, JobType Type, string Payload, int Priority)
+        {
+
+        }
     }
 }
