@@ -12,10 +12,11 @@ namespace snus_klk1.service
             new(() => new Random(Guid.NewGuid().GetHashCode()));
         int WorkerCount = 1;
         ConcurrentPriorityQueue Queue;
-        ProcessingSystem system;
+        private readonly ProcessingSystem _system;
 
-        public JobProducer(int workerCount, ConcurrentPriorityQueue queue)
+        public JobProducer(int workerCount, ConcurrentPriorityQueue queue, ProcessingSystem system)
         {
+            _system = system;
             Queue = queue;
             WorkerCount = workerCount;
         }
@@ -31,7 +32,7 @@ namespace snus_klk1.service
                     while (true)
                     {
                         var job = ProduceJob(rnd);
-                        system.Submit(job);
+                        _system.Submit(job);
                     }
                 });
             }
@@ -48,7 +49,9 @@ namespace snus_klk1.service
             {
                 payload = GenerateIOPayload(rnd);
             }
-            return new Job(type, payload, rnd.Next(10));
+            Job job = new Job(type, payload, rnd.Next(10));
+            LogGenerated(job);
+            return job;
         }
 
         private string GeneratePrimePayload(Random rnd)
@@ -60,9 +63,19 @@ namespace snus_klk1.service
 
         private string GenerateIOPayload(Random rnd)
         {
-            int delay = rnd.Next(15000);
+            int delay = rnd.Next(50, 3000);
 
             return $"delay:{delay:N0}".Replace(",", "_");
+        }
+
+        private void LogGenerated(Job job)
+        {
+            lock (GlobalMutex.consoleMutex)
+            {
+                Console.WriteLine(
+                $"[{DateTime.Now}] [GENERATED] {job.Id}, {job.Type}, {job.Payload}"
+            );
+            }
         }
     }
 }

@@ -105,7 +105,7 @@ namespace snus_klk1.service
                 }
                 if (tries >= maxTries)
                 {
-                    throw new NotImplementedException();
+                    throw new TimeoutException("Job failed after 3 attempts");
                 }
             }
         }

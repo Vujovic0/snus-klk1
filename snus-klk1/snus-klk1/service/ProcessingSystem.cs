@@ -7,11 +7,37 @@ using snus_klk1.model;
 
 namespace snus_klk1.service
 {
+    public class JobCompletedEventArgs : EventArgs
+    {
+        public Guid JobId { get; }
+        public int Result { get; }
+
+        public JobCompletedEventArgs(Guid jobId, int result)
+        {
+            JobId = jobId;
+            Result = result;
+        }
+    }
+
+    public class JobFailedEventArgs : EventArgs
+    {
+        public Guid JobId { get; }
+        public Exception Exception { get; }
+
+        public JobFailedEventArgs(Guid jobId, Exception ex)
+        {
+            JobId = jobId;
+            Exception = ex;
+        }
+    }
+
     internal class ProcessingSystem
     {
         private readonly ConcurrentPriorityQueue _queue;
         private readonly ConcurrentDictionary<Guid, bool> _seenJobs = new();
         private readonly int _workerCount;
+        public event EventHandler<JobCompletedEventArgs>? JobCompleted;
+        public event EventHandler<JobFailedEventArgs>? JobFailed;
 
         public ProcessingSystem(ConcurrentPriorityQueue queue, int workerCount)
         {
@@ -42,17 +68,19 @@ namespace snus_klk1.service
                 {
                     while (true)
                     {
-                        QueuedJob? qj = _queue.Dequeue();
-                        if (qj == null) continue;
+                        QueuedJob? queuedJob = _queue.Dequeue();
+                        if (queuedJob == null) continue;
 
                         try
                         {
-                            int result = await JobHandler.HandleJob(qj.Job);
-                            qj.Tcs.TrySetResult(result);
+                            int result = await JobHandler.HandleJob(queuedJob.Job);
+                            queuedJob.Tcs.TrySetResult(result);
+                            JobCompleted?.Invoke(this, new JobCompletedEventArgs(queuedJob.Job.Id, result));
                         }
                         catch (Exception ex)
                         {
-                            qj.Tcs.TrySetException(ex);
+                            queuedJob.Tcs.TrySetException(ex);
+                            JobFailed?.Invoke(this,new JobFailedEventArgs(queuedJob.Job.Id, ex));
                         }
                     }
                 });
