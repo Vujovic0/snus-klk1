@@ -38,11 +38,14 @@ namespace snus_klk1.service
         private readonly int _workerCount;
         public event EventHandler<JobCompletedEventArgs>? JobCompleted;
         public event EventHandler<JobFailedEventArgs>? JobFailed;
+        private ConcurrentDictionary<Guid, JobRecord> _jobs = new();
+        private readonly Reporter reporter;
 
         public ProcessingSystem(ConcurrentPriorityQueue queue, int workerCount)
         {
             _queue = queue;
             _workerCount = workerCount;
+            reporter = new(_jobs);
             StartWorkers();
         }
 
@@ -73,12 +76,31 @@ namespace snus_klk1.service
 
                         try
                         {
+                            var start = DateTime.Now;
+
                             int result = await JobHandler.HandleJob(queuedJob.Job);
+
+                            var duration = DateTime.Now - start;
+
+                            _jobs[queuedJob.Job.Id] = new JobRecord
+                            {
+                                Job = queuedJob.Job,
+                                Result = result,
+                                Success = true,
+                                Duration = duration
+                            };
                             queuedJob.Tcs.TrySetResult(result);
                             JobCompleted?.Invoke(this, new JobCompletedEventArgs(queuedJob.Job.Id, result));
                         }
                         catch (Exception ex)
                         {
+                            _jobs[queuedJob.Job.Id] = new JobRecord
+                            {
+                                Job = queuedJob.Job,
+                                Result = null,
+                                Success = false,
+                                Duration = TimeSpan.Zero
+                            };
                             queuedJob.Tcs.TrySetException(ex);
                             JobFailed?.Invoke(this,new JobFailedEventArgs(queuedJob.Job.Id, ex));
                         }
@@ -86,5 +108,14 @@ namespace snus_klk1.service
                 });
             }
         }
+
+        public Job GetJob(Guid id)
+        {
+            return _jobs.TryGetValue(id, out var record)
+                ? record.Job
+                : null;
+        }
+
+
     }
 }

@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
+using snus_klk1;
 using snus_klk1.model;
 using snus_klk1.service;
 
@@ -7,8 +9,17 @@ class Program
 {
     static async Task Main(string[] args)
     {
-        var queue = new ConcurrentPriorityQueue(100);
-        var system = new ProcessingSystem(queue, workerCount: 4);
+        var config = XMLParser.Parse("SystemConfig.xml");
+        int workerCount = Config.workerCount;
+        int maxQueueSize = Config.maxQueueSize;
+        if (Config.setupFromFile)
+        {
+            workerCount = (int)config["WorkerCount"];
+            maxQueueSize = (int)config["MaxQueueSize"];
+        }
+        List<Job> jobs = (List<Job>)config["Jobs"];
+        var queue = new ConcurrentPriorityQueue(maxQueueSize);
+        var system = new ProcessingSystem(queue, workerCount);
         system.JobCompleted += async (sender, e) =>
         {
             await Logger.LogAsync("COMPLETED", e.JobId, e.Result.ToString());
@@ -18,8 +29,13 @@ class Program
             await Logger.LogAsync("ABORT", e.JobId, "FAILED");
         };
         var producer = new JobProducer(workerCount: 3, queue, system);
-        producer.ParallelProduceJobs();
-        Console.WriteLine("System running... Press ENTER to stop.\n");
+        _ = Task.Run(() => producer.ParallelProduceJobs());
+        foreach (var job in jobs)
+        {
+            system.Submit(job);
+        }
+
+        Console.WriteLine("System running... press ENTER to exit");
         Console.ReadLine();
     }
 }

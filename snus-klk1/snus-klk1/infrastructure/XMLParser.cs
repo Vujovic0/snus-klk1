@@ -25,13 +25,16 @@ namespace snus_klk1.service
 
             foreach (var jobNode in root.Element("Jobs").Elements("Job"))
             {
-                JobType type = Enum.Parse<JobType>(jobNode.Attribute("Type").Value);
+                JobType type = Enum.Parse<JobType>(jobNode.Attribute("Type").Value.ToUpper());
 
                 string payload = jobNode.Attribute("Payload").Value;
 
                 int priority = int.Parse(jobNode.Attribute("Priority").Value);
-
-                jobs.Add(new Job(type, payload, priority));
+                Job job = new(type, payload, priority);
+                jobs.Add(job);
+                Console.WriteLine(
+                    $"[{DateTime.Now}] [PARSED_JOB] {job.Id}, {job.Type}, Priority={priority}, Payload={payload}"
+                );
             }
 
             return new Dictionary<string, object>

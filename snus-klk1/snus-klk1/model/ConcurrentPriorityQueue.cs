@@ -58,6 +58,30 @@ namespace snus_klk1.model
             return null;
         }
 
+        public IEnumerable<Job> GetTopJobs(int n)
+        {
+            List<Job> result = new();
+            List<QueuedJob> temp = new();
+            AccessSemaphore.Wait();
+            try
+            {
+                while (QueueCounterSemaphore.CurrentCount > 0 && temp.Count < n)
+                {
+                    QueuedJob job = Queue.Dequeue();
+                    temp.Add(job);
+                    result.Add(job.Job);
+                }
+                foreach (QueuedJob job in temp)
+                {
+                    Queue.Enqueue(job, job.Job.Priority);
+                }
+            }
+            finally
+            {
+                AccessSemaphore.Release();
+            }
 
+            return result;
+        }
     }
 }

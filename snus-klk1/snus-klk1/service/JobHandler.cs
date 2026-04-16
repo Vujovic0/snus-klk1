@@ -97,7 +97,7 @@ namespace snus_klk1.service
             {
                 tries++;
                 Task<int> jobExecution = ExecuteJob(job, payload);
-                Task timeout = Task.Delay(2000);
+                Task timeout = Task.Delay(Config.allowedDelayMs);
                 Task completed = await Task.WhenAny(jobExecution, timeout);
                 if (completed == jobExecution)
                 {

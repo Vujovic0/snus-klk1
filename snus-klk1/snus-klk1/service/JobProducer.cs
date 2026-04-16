@@ -50,7 +50,7 @@ namespace snus_klk1.service
                 payload = GenerateIOPayload(rnd);
             }
             Job job = new Job(type, payload, rnd.Next(10));
-            LogGenerated(job);
+            //LogGenerated(job);
             return job;
         }
 
@@ -58,7 +58,7 @@ namespace snus_klk1.service
         {
             int numbers = rnd.Next(200000);
             int threads = rnd.Next(1, 9);
-            return $"numbers:{numbers:N0},threads:{threads}".Replace(",", "_");
+            return $"numbers:{numbers:N0}".Replace(",", "_") + $",threads:{threads}";
         }
 
         private string GenerateIOPayload(Random rnd)
