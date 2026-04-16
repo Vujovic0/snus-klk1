@@ -12,6 +12,7 @@ namespace snus_klk1.service
             new(() => new Random(Guid.NewGuid().GetHashCode()));
         int WorkerCount = 1;
         ConcurrentPriorityQueue Queue;
+        ProcessingSystem system;
 
         public JobProducer(int workerCount, ConcurrentPriorityQueue queue)
         {
@@ -29,9 +30,8 @@ namespace snus_klk1.service
 
                     while (true)
                     {
-                        Job job = ProduceJob(rnd);
-
-                        Queue.Enqueue(job);
+                        var job = ProduceJob(rnd);
+                        system.Submit(job);
                     }
                 });
             }

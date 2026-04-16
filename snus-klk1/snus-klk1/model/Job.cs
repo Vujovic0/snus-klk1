@@ -7,14 +7,17 @@ namespace snus_klk1.model
 {
     internal class Job
     {
-        private Guid Id { set; get; }
-        private JobType Type { set; get; }
-        private string Payload { set; get; } = string.Empty;
-        private int Priority { set; get; }
+        public Guid Id {private set; get; }
+        public JobType Type {private set; get; }
+        public string Payload {private set; get; } = string.Empty;
+        public int Priority {private set; get; }
 
-        public Job(Guid Id, JobType Type, string Payload, int Priority)
+        public Job(JobType Type, string Payload, int Priority)
         {
-
+            this.Id = Guid.NewGuid();
+            this.Type = Type;
+            this.Payload = Payload;
+            this.Priority = Priority;
         }
     }
 }

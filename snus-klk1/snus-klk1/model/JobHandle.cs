@@ -6,7 +6,13 @@ namespace snus_klk1.model
 {
     internal class JobHandle
     {
-        private Guid Id { set; get; }
-        private Task<int>  Result { set; get; }
+        public Guid Id {private set; get; }
+        public Task<int>  Result {private set; get; }
+
+        public JobHandle(Guid id, Task<int> result)
+        {
+            this.Id = id;
+            this.Result = result;
+        }
     }
 }

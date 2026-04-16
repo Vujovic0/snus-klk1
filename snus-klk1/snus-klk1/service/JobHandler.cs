@@ -1,12 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using snus_klk1.model;
+using snus_klk1.model.enums;
 
 namespace snus_klk1.service
 {
     internal static class JobHandler
     {
-        static bool IsPrime(int number)
+        public static bool IsPrime(int number)
         {
             if (number < 2) return false;
             if (number == 2) return true;
@@ -20,7 +22,7 @@ namespace snus_klk1.service
             return true;
         }
 
-        static int SerialCountPrimes(int start, int end)
+        public static int SerialCountPrimes(int start, int end)
         {
             int primesCount = 0;
 
@@ -35,7 +37,7 @@ namespace snus_klk1.service
             return primesCount;
         }
 
-        static async Task<int> ParallelCountPrimes(int limit, int threadNum)
+        public static async Task<int> ParallelCountPrimes(int limit, int threadNum)
         {
             threadNum = Math.Clamp(threadNum, 1, 8);
             int chunkSize = limit / threadNum;
@@ -59,14 +61,16 @@ namespace snus_klk1.service
             return total;
         }
 
-        static async Task<int> SimulateIO(int ms){
-            Thread.Sleep(ms);
-            Random rnd = new Random();
-            return rnd.Next(101);
+        public static Task<int> SimulateIO(int ms)
+        {
+            return Task.Run(() =>
+            {
+                Thread.Sleep(ms);
+                return Random.Shared.Next(101);
+            });
         }
 
-
-        static Dictionary<string, int> ParsePayload(string payload){
+        public static Dictionary<string, int> ParsePayload(string payload){
             Dictionary<string, int> result = new ();
             if (string.IsNullOrWhiteSpace(payload))
                 return result;
@@ -82,6 +86,40 @@ namespace snus_klk1.service
             }
 
             return result;
+        }
+
+        public static async Task<int> HandleJob(Job job)
+        {
+            Dictionary<string, int> payload = ParsePayload(job.Payload);
+            int tries = 0;
+            const int maxTries = 3;
+            while (true)
+            {
+                tries++;
+                Task<int> jobExecution = ExecuteJob(job, payload);
+                Task timeout = Task.Delay(2000);
+                Task completed = await Task.WhenAny(jobExecution, timeout);
+                if (completed == jobExecution)
+                {
+                    return await jobExecution;
+                }
+                if (tries >= maxTries)
+                {
+                    throw new NotImplementedException();
+                }
+            }
+        }
+
+        private static async Task<int> ExecuteJob(Job job, Dictionary<string, int> payload)
+        {
+            if (job.Type == JobType.PRIME)
+            {
+                return await ParallelCountPrimes(payload["numbers"], payload["threads"]);
+            }
+            else
+            {
+                return await SimulateIO(payload["delay"]);
+            }
         }
     }
 }
