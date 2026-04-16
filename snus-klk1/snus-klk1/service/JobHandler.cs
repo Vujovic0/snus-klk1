@@ -66,26 +66,18 @@ namespace snus_klk1.service
         }
 
 
-        static Dictionary<string, int> ParsePayload(string payload)
-{
-            var result = new Dictionary<string, int>();
-
+        static Dictionary<string, int> ParsePayload(string payload){
+            Dictionary<string, int> result = new ();
             if (string.IsNullOrWhiteSpace(payload))
                 return result;
-
-            var parts = payload.Split(',');
-
+            string[] parts = payload.Split(',');
             foreach (var part in parts)
             {
                 string[] kvpair = part.Split(':');
-
                 if (kvpair.Length != 2)
                     continue;
-
                 string key = kvpair[0].Trim();
-
                 int value = int.Parse(kvpair[1].Replace("_", ""));
-
                 result[key] = value;
             }
 
