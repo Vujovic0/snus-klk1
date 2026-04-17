@@ -40,13 +40,14 @@ namespace snus_klk1.service
         public event EventHandler<JobFailedEventArgs>? JobFailed;
         private readonly ConcurrentDictionary<Guid, JobRecord> _jobs = new();
         private readonly Reporter reporter;
+        private readonly int _allowedDelayMs;
 
-        public ProcessingSystem(ConcurrentPriorityQueue queue, int workerCount, int reportDelaySeconds)
+        public ProcessingSystem(ConcurrentPriorityQueue queue, int workerCount, int reportDelaySeconds, int allowedDelayMs)
         {
             _queue = queue;
             _workerCount = workerCount;
+            _allowedDelayMs = allowedDelayMs;
             reporter = new(_jobs, reportDelaySeconds);
-            StartWorkers();
         }
 
         internal JobHandle Submit(Job job)
@@ -63,7 +64,7 @@ namespace snus_klk1.service
             return new JobHandle(job.Id, tcs.Task);
         }
 
-        private void StartWorkers()
+        public void StartWorkers()
         {
             for (int i = 0; i < _workerCount; i++)
             {
@@ -78,7 +79,7 @@ namespace snus_klk1.service
                         {
                             var start = DateTime.Now;
 
-                            int result = await JobHandler.HandleJob(queuedJob.Job);
+                            int result = await JobHandler.HandleJob(queuedJob.Job, _allowedDelayMs);
 
                             var duration = DateTime.Now - start;
 

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace snus_klk1.model
@@ -60,21 +61,20 @@ namespace snus_klk1.model
 
         public IEnumerable<Job> GetTopJobs(int n)
         {
+            if (n <= 0)
+            {
+                return Enumerable.Empty<Job>();
+            }
+
             List<Job> result = new();
-            List<QueuedJob> temp = new();
             AccessSemaphore.Wait();
             try
             {
-                while (QueueCounterSemaphore.CurrentCount > 0 && temp.Count < n)
-                {
-                    QueuedJob job = Queue.Dequeue();
-                    temp.Add(job);
-                    result.Add(job.Job);
-                }
-                foreach (QueuedJob job in temp)
-                {
-                    Queue.Enqueue(job, job.Job.Priority);
-                }
+                result = Queue.UnorderedItems
+                    .OrderBy(item => item.Priority)
+                    .Take(n)
+                    .Select(item => item.Element.Job)
+                    .ToList();
             }
             finally
             {

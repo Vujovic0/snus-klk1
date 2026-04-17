@@ -9,33 +9,40 @@ class Program
 {
     static void Main(string[] args)
     {
-        var config = XMLParser.Parse("SystemConfig.xml");
-        int workerCount = Config.workerCount;
-        int maxQueueSize = Config.maxQueueSize;
-        if (Config.setupFromFile)
+        try
         {
-            workerCount = (int)config["WorkerCount"];
-            maxQueueSize = (int)config["MaxQueueSize"];
+            Console.WriteLine("System running... press ENTER to exit");
+            var config = XMLParser.Parse("SystemConfig.xml");
+            int workerCount = Config.workerCount;
+            int maxQueueSize = Config.maxQueueSize;
+            if (Config.setupFromFile)
+            {
+                workerCount = (int)config["WorkerCount"];
+                maxQueueSize = (int)config["MaxQueueSize"];
+            }
+            List<Job> jobs = (List<Job>)config["Jobs"];
+            var queue = new ConcurrentPriorityQueue(maxQueueSize);
+            var system = new ProcessingSystem(queue, workerCount, Config.reportCooldownSeconds, Config.allowedDelayMs);
+            system.JobCompleted += async (sender, e) =>
+            {
+                await Logger.LogAsync("COMPLETED", e.JobId, e.Result.ToString());
+            };
+            system.JobFailed += async (sender, e) =>
+            {
+                await Logger.LogAsync("ABORT", e.JobId, "FAILED");
+            };
+            foreach (var job in jobs)
+            {
+                system.Submit(job);
+            }
+            var producer = new JobProducer(workerCount, queue, system, Config.primeRange, Config.ioRangeMs, Config.priorityRange);
+            system.StartWorkers();
+            _ = Task.Run(() => producer.ParallelProduceJobs());
+            Console.ReadLine();
+        } catch (Exception e)
+        {
+            Console.WriteLine(e.StackTrace);
         }
-        List<Job> jobs = (List<Job>)config["Jobs"];
-        var queue = new ConcurrentPriorityQueue(maxQueueSize);
-        var system = new ProcessingSystem(queue, workerCount, 60);
-        system.JobCompleted += async (sender, e) =>
-        {
-            await Logger.LogAsync("COMPLETED", e.JobId, e.Result.ToString());
-        };
-        system.JobFailed += async (sender, e) =>
-        {
-            await Logger.LogAsync("ABORT", e.JobId, "FAILED");
-        };
-        var producer = new JobProducer(workerCount, queue, system, 100000000, 3000, 10);
-        _ = Task.Run(() => producer.ParallelProduceJobs());
-        foreach (var job in jobs)
-        {
-            system.Submit(job);
-        }
-
-        Console.WriteLine("System running... press ENTER to exit");
-        Console.ReadLine();
+        
     }
 }

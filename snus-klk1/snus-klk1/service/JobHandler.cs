@@ -89,7 +89,7 @@ namespace snus_klk1.service
             return result;
         }
 
-        public static async Task<int> HandleJob(Job job)
+        public static async Task<int> HandleJob(Job job, int allowedDelayMs)
         {
             Dictionary<string, int> payload = ParsePayload(job.Payload);
             int tries = 0;
@@ -101,7 +101,7 @@ namespace snus_klk1.service
 
                 using var cts = new CancellationTokenSource();
                 Task<int> jobExecution = ExecuteJob(job, payload, cts.Token);
-                Task timeout = Task.Delay(Config.allowedDelayMs);
+                Task timeout = Task.Delay(allowedDelayMs);
 
                 Task completed = await Task.WhenAny(jobExecution, timeout);
 
