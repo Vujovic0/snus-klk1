@@ -20,6 +20,10 @@ internal static class Logger
             }
             await File.AppendAllTextAsync(path, line);
         }
+        catch(Exception e)
+        {
+            Console.WriteLine(e.ToString());
+        }
         finally
         {
             _mutex.Release();

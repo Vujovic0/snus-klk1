@@ -19,7 +19,7 @@ class Program
         }
         List<Job> jobs = (List<Job>)config["Jobs"];
         var queue = new ConcurrentPriorityQueue(maxQueueSize);
-        var system = new ProcessingSystem(queue, workerCount, 10);
+        var system = new ProcessingSystem(queue, workerCount, 60);
         system.JobCompleted += async (sender, e) =>
         {
             await Logger.LogAsync("COMPLETED", e.JobId, e.Result.ToString());
@@ -28,7 +28,7 @@ class Program
         {
             await Logger.LogAsync("ABORT", e.JobId, "FAILED");
         };
-        var producer = new JobProducer(workerCount, queue, system, 1000000, 3000, 10);
+        var producer = new JobProducer(workerCount, queue, system, 100000000, 3000, 10);
         _ = Task.Run(() => producer.ParallelProduceJobs());
         foreach (var job in jobs)
         {

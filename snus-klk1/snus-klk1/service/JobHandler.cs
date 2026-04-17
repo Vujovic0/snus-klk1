@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
 using snus_klk1.model;
@@ -8,6 +9,15 @@ namespace snus_klk1.service
 {
     internal static class JobHandler
     {
+        private static readonly ConcurrentBag<int> KnownPrimes = new();
+        private static readonly object PrimeCacheLock = new();
+        private static int _cachedPrimeUpperBound = 2;
+
+        static JobHandler()
+        {
+            KnownPrimes.Add(2);
+        }
+
         public static bool IsPrime(int number)
         {
             if (number < 2) return false;
@@ -22,22 +32,70 @@ namespace snus_klk1.service
             return true;
         }
 
-        public static int SerialCountPrimes(int start, int end)
+        public static int SerialCountPrimes(int start, int end, CancellationToken ct)
         {
-            int primesCount = 0;
-
-            for (int i = start; i <= end; i++)
+            if (start > end || end < 2)
             {
-                if (IsPrime(i))
+                return 0;
+            }
+
+            int from = Math.Max(start, 2);
+            EnsurePrimeCacheUpTo(end, ct);
+
+            int primesCount = 0;
+            int[] snapshot = KnownPrimes.ToArray();
+            Array.Sort(snapshot);
+
+            for (int i = 0; i < snapshot.Length; i++)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                int prime = snapshot[i];
+                if (prime < from)
                 {
-                    primesCount++;
+                    continue;
                 }
+
+                if (prime > end)
+                {
+                    break;
+                }
+
+                primesCount++;
             }
 
             return primesCount;
         }
 
-        public static async Task<int> ParallelCountPrimes(int limit, int threadNum)
+        private static void EnsurePrimeCacheUpTo(int end, CancellationToken ct)
+        {
+            if (end <= Volatile.Read(ref _cachedPrimeUpperBound))
+            {
+                return;
+            }
+
+            lock (PrimeCacheLock)
+            {
+                if (end <= _cachedPrimeUpperBound)
+                {
+                    return;
+                }
+
+                for (int i = _cachedPrimeUpperBound + 1; i <= end; i++)
+                {
+                    ct.ThrowIfCancellationRequested();
+
+                    if (IsPrime(i))
+                    {
+                        KnownPrimes.Add(i);
+                    }
+
+                    _cachedPrimeUpperBound = i;
+                }
+            }
+        }
+
+        public static async Task<int> ParallelCountPrimes(int limit, int threadNum, CancellationToken ct)
         {
             threadNum = Math.Clamp(threadNum, 1, 8);
             int chunkSize = limit / threadNum;
@@ -48,8 +106,8 @@ namespace snus_klk1.service
                 int end = (i+1 == threadNum) ? limit : (i + 1) * chunkSize;
                 tasks.Add(Task.Run(() =>
                 {
-                    return SerialCountPrimes(start, end);
-                }));
+                    return SerialCountPrimes(start, end, ct);
+                }, ct));
             }
             int[] results = await Task.WhenAll(tasks);
             int total = 0;
@@ -93,28 +151,41 @@ namespace snus_klk1.service
             Dictionary<string, int> payload = ParsePayload(job.Payload);
             int tries = 0;
             const int maxTries = 3;
-            while (true)
+
+            while (tries < maxTries)
             {
                 tries++;
-                Task<int> jobExecution = ExecuteJob(job, payload);
+
+                using var cts = new CancellationTokenSource();
+                Task<int> jobExecution = ExecuteJob(job, payload, cts.Token);
                 Task timeout = Task.Delay(Config.allowedDelayMs);
+
                 Task completed = await Task.WhenAny(jobExecution, timeout);
+
                 if (completed == jobExecution)
                 {
                     return await jobExecution;
                 }
-                if (tries >= maxTries)
+
+                cts.Cancel();
+
+                try
                 {
-                    throw new TimeoutException("Job failed after 3 attempts");
+                    await jobExecution;
+                }
+                catch (OperationCanceledException)
+                {
                 }
             }
+
+            throw new TimeoutException("Job failed after 3 attempts");
         }
 
-        private static async Task<int> ExecuteJob(Job job, Dictionary<string, int> payload)
+        private static async Task<int> ExecuteJob(Job job, Dictionary<string, int> payload, CancellationToken ct)
         {
             if (job.Type == JobType.PRIME)
             {
-                return await ParallelCountPrimes(payload["numbers"], payload["threads"]);
+                return await ParallelCountPrimes(payload["numbers"], payload["threads"], ct);
             }
             else
             {
