@@ -38,14 +38,14 @@ namespace snus_klk1.service
         private readonly int _workerCount;
         public event EventHandler<JobCompletedEventArgs>? JobCompleted;
         public event EventHandler<JobFailedEventArgs>? JobFailed;
-        private ConcurrentDictionary<Guid, JobRecord> _jobs = new();
+        private readonly ConcurrentDictionary<Guid, JobRecord> _jobs = new();
         private readonly Reporter reporter;
 
-        public ProcessingSystem(ConcurrentPriorityQueue queue, int workerCount)
+        public ProcessingSystem(ConcurrentPriorityQueue queue, int workerCount, int reportDelaySeconds)
         {
             _queue = queue;
             _workerCount = workerCount;
-            reporter = new(_jobs);
+            reporter = new(_jobs, reportDelaySeconds);
             StartWorkers();
         }
 
@@ -114,6 +114,11 @@ namespace snus_klk1.service
             return _jobs.TryGetValue(id, out var record)
                 ? record.Job
                 : null;
+        }
+
+        public IEnumerable<Job> GetTopJobs(int n)
+        {
+            return this._queue.GetTopJobs(n);
         }
 
 

@@ -12,13 +12,19 @@ namespace snus_klk1.service
             new(() => new Random(Guid.NewGuid().GetHashCode()));
         int WorkerCount = 1;
         ConcurrentPriorityQueue Queue;
+        private readonly int _primeRange;
+        private readonly int _ioRange;
+        private readonly int _priorityRange;
         private readonly ProcessingSystem _system;
 
-        public JobProducer(int workerCount, ConcurrentPriorityQueue queue, ProcessingSystem system)
+        public JobProducer(int workerCount, ConcurrentPriorityQueue queue, ProcessingSystem system, int primeRange, int ioRange, int priorityRange)
         {
             _system = system;
             Queue = queue;
             WorkerCount = workerCount;
+            _primeRange = primeRange;
+            _ioRange = ioRange;
+            _priorityRange = priorityRange;
         }
 
         public void ParallelProduceJobs()
@@ -27,13 +33,20 @@ namespace snus_klk1.service
             {
                 Task.Run(() =>
                 {
-                    var rnd = Rnd.Value;
-
-                    while (true)
+                    try
                     {
-                        var job = ProduceJob(rnd);
-                        _system.Submit(job);
+                        var rnd = Rnd.Value;
+
+                        while (true)
+                        {
+                            var job = ProduceJob(rnd);
+                            _system.Submit(job);
+                        }
+                    } catch (Exception e)
+                    {
+                        Console.WriteLine(e.ToString());
                     }
+                    
                 });
             }
         }
@@ -49,21 +62,21 @@ namespace snus_klk1.service
             {
                 payload = GenerateIOPayload(rnd);
             }
-            Job job = new Job(type, payload, rnd.Next(10));
+            Job job = new Job(type, payload, rnd.Next(_priorityRange));
             //LogGenerated(job);
             return job;
         }
 
         private string GeneratePrimePayload(Random rnd)
         {
-            int numbers = rnd.Next(200000);
+            int numbers = rnd.Next(_primeRange);
             int threads = rnd.Next(1, 9);
             return $"numbers:{numbers:N0}".Replace(",", "_") + $",threads:{threads}";
         }
 
         private string GenerateIOPayload(Random rnd)
         {
-            int delay = rnd.Next(50, 3000);
+            int delay = rnd.Next(50, _ioRange);
 
             return $"delay:{delay:N0}".Replace(",", "_");
         }

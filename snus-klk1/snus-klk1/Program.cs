@@ -7,7 +7,7 @@ using snus_klk1.service;
 
 class Program
 {
-    static async Task Main(string[] args)
+    static void Main(string[] args)
     {
         var config = XMLParser.Parse("SystemConfig.xml");
         int workerCount = Config.workerCount;
@@ -19,7 +19,7 @@ class Program
         }
         List<Job> jobs = (List<Job>)config["Jobs"];
         var queue = new ConcurrentPriorityQueue(maxQueueSize);
-        var system = new ProcessingSystem(queue, workerCount);
+        var system = new ProcessingSystem(queue, workerCount, 10);
         system.JobCompleted += async (sender, e) =>
         {
             await Logger.LogAsync("COMPLETED", e.JobId, e.Result.ToString());
@@ -28,7 +28,7 @@ class Program
         {
             await Logger.LogAsync("ABORT", e.JobId, "FAILED");
         };
-        var producer = new JobProducer(workerCount: 3, queue, system);
+        var producer = new JobProducer(workerCount, queue, system, 1000000, 3000, 10);
         _ = Task.Run(() => producer.ParallelProduceJobs());
         foreach (var job in jobs)
         {

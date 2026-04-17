@@ -12,15 +12,22 @@ namespace snus_klk1.service
         private const int MaxReports = 10;
         ConcurrentDictionary<Guid, JobRecord> _jobs;
 
-        public Reporter(ConcurrentDictionary<Guid, JobRecord> jobs)
+        public Reporter(ConcurrentDictionary<Guid, JobRecord> jobs, int reportDelaySeconds)
         {
             _jobs = jobs;
             Task.Run(async () =>
             {
-                while (true)
+                try
                 {
-                    await Task.Delay(TimeSpan.FromMinutes(1));
-                    RotateReport();
+                    while (true)
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(reportDelaySeconds));
+                        RotateReport();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex);
                 }
             });
         }
@@ -46,6 +53,8 @@ namespace snus_klk1.service
         {
             var doc = new System.Xml.Linq.XDocument(
                 new System.Xml.Linq.XElement("Report",
+                new System.Xml.Linq.XAttribute("Id", _reportIndex),
+                    new System.Xml.Linq.XAttribute("Timestamp", DateTime.Now),
                     report.Select(r =>
                         new System.Xml.Linq.XElement("JobType",
                             new System.Xml.Linq.XAttribute("type", r.JobType),
