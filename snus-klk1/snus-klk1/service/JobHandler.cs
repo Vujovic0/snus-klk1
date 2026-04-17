@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
 using snus_klk1.model;
@@ -9,15 +8,6 @@ namespace snus_klk1.service
 {
     internal static class JobHandler
     {
-        private static readonly ConcurrentBag<int> KnownPrimes = new();
-        private static readonly object PrimeCacheLock = new();
-        private static int _cachedPrimeUpperBound = 2;
-
-        static JobHandler()
-        {
-            KnownPrimes.Add(2);
-        }
-
         public static bool IsPrime(int number)
         {
             if (number < 2) return false;
@@ -34,65 +24,18 @@ namespace snus_klk1.service
 
         public static int SerialCountPrimes(int start, int end, CancellationToken ct)
         {
-            if (start > end || end < 2)
-            {
-                return 0;
-            }
-
-            int from = Math.Max(start, 2);
-            EnsurePrimeCacheUpTo(end, ct);
-
             int primesCount = 0;
-            int[] snapshot = KnownPrimes.ToArray();
-            Array.Sort(snapshot);
 
-            for (int i = 0; i < snapshot.Length; i++)
+            for (int i = start; i <= end; i++)
             {
                 ct.ThrowIfCancellationRequested();
-
-                int prime = snapshot[i];
-                if (prime < from)
+                if (IsPrime(i))
                 {
-                    continue;
+                    primesCount++;
                 }
-
-                if (prime > end)
-                {
-                    break;
-                }
-
-                primesCount++;
             }
 
             return primesCount;
-        }
-
-        private static void EnsurePrimeCacheUpTo(int end, CancellationToken ct)
-        {
-            if (end <= Volatile.Read(ref _cachedPrimeUpperBound))
-            {
-                return;
-            }
-
-            lock (PrimeCacheLock)
-            {
-                if (end <= _cachedPrimeUpperBound)
-                {
-                    return;
-                }
-
-                for (int i = _cachedPrimeUpperBound + 1; i <= end; i++)
-                {
-                    ct.ThrowIfCancellationRequested();
-
-                    if (IsPrime(i))
-                    {
-                        KnownPrimes.Add(i);
-                    }
-
-                    _cachedPrimeUpperBound = i;
-                }
-            }
         }
 
         public static async Task<int> ParallelCountPrimes(int limit, int threadNum, CancellationToken ct)
